@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import Loader from 'react-loader-spinner';
 import fetchAPI from './services/fetchApi';
@@ -10,113 +10,89 @@ import 'react-toastify/dist/ReactToastify.css';
 import 'react-loader-spinner/dist/loader/css/react-spinner-loader.css';
 
 const Status = {
-  IDLE: 'idle', //обa false
-  RESOLVED: 'resolved', //loader false, button true
-  PENDING: 'pending', //loader true, button false
+  IDLE: 'idle', //both are false
+  RESOLVED: 'resolved', //loader is false, button is true
+  PENDING: 'pending', //loader is true, button is false
 };
 
-class App extends Component {
-  state = {
-    searchQuery: '',
-    page: 1,
-    result: [],
-    showModal: false,
-    status: Status.IDLE,
-    largeImage: null,
-  };
+const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [status, setStatus] = useState(Status.IDLE);
+  const [largeImage, setLargeImage] = useState(null);
+  const isFirstRender = useRef(true);
 
-  async componentDidUpdate(prevProps, prevState) {
-    const { searchQuery } = this.state;
-
-    if (searchQuery !== prevState.searchQuery) {
-      this.setState({
-        result: [],
-        status: Status.PENDING,
-      });
-
-      this.onFetchImages(
-        1,
-        this.onErrorNoImages(searchQuery),
-        this.onErrorNoMoreImages(searchQuery),
-      );
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-  }
+    setStatus(Status.PENDING);
 
-  onLoadMoreClick = async () => {
-    const { page, searchQuery } = this.state;
-    this.setState({
-      status: Status.PENDING,
-    });
+    const errors = {
+      noImages: `No images found for "${searchQuery}". Try again.`,
+      noMore: `No more images for "${searchQuery}".`,
+    };
 
-    this.onFetchImages(
-      page,
-      this.onErrorNoMoreImages(searchQuery),
-      this.onErrorNoMoreImages(searchQuery),
-    );
+    const onFetchImages = async page => {
+      try {
+        const { hits } = await fetchAPI(searchQuery, page);
+
+        if (hits.length === 0) {
+          throw new Error(errors.noImages);
+        }
+
+        if (hits.length < 12) {
+          setResult(prevState => [...prevState, ...hits]);
+          throw new Error(errors.noMore);
+        }
+        setStatus(Status.RESOLVED);
+        setResult(prevState => [...prevState, ...hits]);
+        window.scrollBy({ top: 1000, behavior: 'smooth' });
+      } catch (error) {
+        if (error.message === errors.noMore) {
+          toast.info(error.message);
+        } else {
+          toast.error(error.message);
+        }
+        setStatus(Status.IDLE);
+      }
+    };
+
+    onFetchImages(page);
+  }, [page, searchQuery]);
+
+  const onLoadMoreClick = () => {
+    setPage(prevState => prevState + 1);
   };
 
-  onFetchImages = async (pageQuery, emptyResultErrorMessage, shortResultErrorMessage) => {
-    const { searchQuery } = this.state;
-
-    try {
-      const { hits } = await fetchAPI(searchQuery, pageQuery);
-
-      if (hits.length === 0) {
-        throw new Error(emptyResultErrorMessage);
-      }
-
-      if (hits.length < 12) {
-        this.setState(prevState => ({
-          result: [...prevState.result, ...hits],
-        }));
-        throw new Error(shortResultErrorMessage);
-      }
-
-      this.setState(prevState => ({
-        status: Status.RESOLVED,
-        result: [...prevState.result, ...hits],
-        page: pageQuery + 1,
-      }));
-      window.scrollBy({ top: 1000, behavior: 'smooth' });
-    } catch (error) {
-      toast.error(error.message);
-      this.setState({ status: Status.IDLE });
+  const handleFormSubmit = newSearchQuery => {
+    if (newSearchQuery !== searchQuery) {
+      setResult([]);
+      setPage(1);
+      setSearchQuery(newSearchQuery);
     }
   };
 
-  onErrorNoImages(query) {
-    return `No images found for "${query}". Try again.`;
-  }
-  onErrorNoMoreImages(query) {
-    return `No more images found for "${query}".`;
-  }
-
-  handleFormSubmit = searchQuery => {
-    this.setState({ searchQuery });
+  const toggleModal = newLargeImage => {
+    setLargeImage(newLargeImage);
+    setShowModal(prevState => !prevState);
   };
 
-  toggleModal = largeImage => {
-    this.setState(prevState => ({
-      largeImage,
-      showModal: !prevState.showModal,
-    }));
-  };
-
-  render() {
-    const { result, status, showModal, largeImage } = this.state;
-    return (
-      <>
-        <Searchbar onSubmit={this.handleFormSubmit} />
-        <ImageGallery result={result} onClick={this.toggleModal} />
-        {status === Status.RESOLVED && <Button onClick={this.onLoadMoreClick} />}
-        {status === Status.PENDING && (
-          <Loader type="ThreeDots" color="#995471" width={100} style={{ textAlign: 'center' }} />
-        )}
-        {showModal && <Modal largeImage={largeImage} onClick={this.toggleModal} />}
-        <ToastContainer position="top-right" autoClose={3000} />
-      </>
-    );
-  }
-}
+  return (
+    <>
+      <Searchbar onSubmit={handleFormSubmit} />
+      <ImageGallery result={result} onClick={toggleModal} />
+      {status === Status.RESOLVED && <Button onClick={onLoadMoreClick} />}
+      {status === Status.PENDING && (
+        <Loader type="ThreeDots" color="#995471" width={100} style={{ textAlign: 'center' }} />
+      )}
+      {showModal && <Modal largeImage={largeImage} onClick={toggleModal} />}
+      <ToastContainer position="top-right" autoClose={3000} />
+    </>
+  );
+};
 
 export default App;
