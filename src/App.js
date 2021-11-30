@@ -31,32 +31,23 @@ const App = () => {
     }
     setStatus(Status.PENDING);
 
-    const errors = {
-      noImages: `No images found for "${searchQuery}". Try again.`,
-      noMore: `No more images for "${searchQuery}".`,
-    };
-
     const onFetchImages = async page => {
       try {
         const { hits } = await fetchAPI(searchQuery, page);
 
         if (hits.length === 0) {
-          throw new Error(errors.noImages);
-        }
-
-        if (hits.length < 12) {
-          setResult(prevState => [...prevState, ...hits]);
-          throw new Error(errors.noMore);
+          toast.error(`No images found for "${searchQuery}". Try again.`);
+          setStatus(Status.IDLE);
+        } else if (hits.length < 12) {
+          toast.info(`No more images for "${searchQuery}".`);
+          setStatus(Status.IDLE);
+        } else {
+          setStatus(Status.RESOLVED);
         }
         setResult(prevState => [...prevState, ...hits]);
-        setStatus(Status.RESOLVED);
         window.scrollBy({ top: 1000, behavior: 'smooth' });
       } catch (error) {
-        if (error.message === errors.noMore) {
-          toast.info(error.message);
-        } else {
-          toast.error(error.message);
-        }
+        toast.error(error.message);
         setStatus(Status.IDLE);
       }
     };

@@ -19,7 +19,7 @@ const Searchbar = ({ onSubmit }) => {
       return;
     }
 
-    onSubmit(searchQuery);
+    onSubmit(searchQuery.trim());
     setSearchQuery('');
   };
 
