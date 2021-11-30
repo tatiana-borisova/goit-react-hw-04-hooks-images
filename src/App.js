@@ -48,8 +48,8 @@ const App = () => {
           setResult(prevState => [...prevState, ...hits]);
           throw new Error(errors.noMore);
         }
-        setStatus(Status.RESOLVED);
         setResult(prevState => [...prevState, ...hits]);
+        setStatus(Status.RESOLVED);
         window.scrollBy({ top: 1000, behavior: 'smooth' });
       } catch (error) {
         if (error.message === errors.noMore) {
